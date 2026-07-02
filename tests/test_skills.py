@@ -7,6 +7,7 @@ import pytest
 from agentevals.models import EvalInput
 from agentevals.skills import (
     CoherenceSkill,
+    CompletenessSkill,
     ConcisenessSkill,
     CorrectnessSkill,
     FaithfulnessSkill,
@@ -165,6 +166,65 @@ class TestConcisenessSkill:
         result = self.skill.evaluate(inp)
         assert result.score == 0.0
         assert result.passed is False
+
+    def test_score_is_in_range(self, basic_input):
+        result = self.skill.evaluate(basic_input)
+        assert 0.0 <= result.score <= 1.0
+
+
+# ---------------------------------------------------------------------------
+# CompletenessSkill
+# ---------------------------------------------------------------------------
+
+class TestCompletenessSkill:
+    skill = CompletenessSkill()
+
+    def test_complete_response_passes(self, basic_input):
+        result = self.skill.evaluate(basic_input)
+        assert result.skill_name == "completeness"
+        assert result.score > 0.5
+        assert result.passed is True
+
+    def test_empty_response_fails(self):
+        inp = EvalInput(question="What is the capital of France?", response="")
+        result = self.skill.evaluate(inp)
+        assert result.score == 0.0
+        assert result.passed is False
+
+    def test_partial_response_scores_less_than_full(self):
+        """A response that only answers one of two sub-questions scores lower."""
+        full_inp = EvalInput(
+            question="What is the capital of France and what language do they speak?",
+            response="The capital of France is Paris. They speak French.",
+        )
+        partial_inp = EvalInput(
+            question="What is the capital of France and what language do they speak?",
+            response="The capital of France is Paris.",
+        )
+        full_result = self.skill.evaluate(full_inp)
+        partial_result = self.skill.evaluate(partial_inp)
+        assert full_result.score >= partial_result.score
+
+    def test_multi_question_full_coverage(self):
+        inp = EvalInput(
+            question="What is Python? How is it used?",
+            response=(
+                "Python is a high-level interpreted programming language. "
+                "It is used for web development, data science, scripting, and automation."
+            ),
+        )
+        result = self.skill.evaluate(inp)
+        assert result.score > 0.5
+        assert result.passed is True
+
+    def test_details_present(self):
+        inp = EvalInput(
+            question="What is the boiling point of water?",
+            response="Water boils at 100 degrees Celsius.",
+        )
+        result = self.skill.evaluate(inp)
+        assert "sub_questions_total" in result.details
+        assert "sub_questions_covered" in result.details
 
     def test_score_is_in_range(self, basic_input):
         result = self.skill.evaluate(basic_input)
