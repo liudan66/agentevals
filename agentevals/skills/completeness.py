@@ -119,13 +119,15 @@ class CompletenessSkill(BaseSkill):
 
         resp_kw = keywords(response)
         covered = 0
+        total = len(sub_questions)
         coverage_detail: list[str] = []
 
         for sq in sub_questions:
             sq_kw = keywords(sq)
             if not sq_kw:
-                covered += 1  # vacuously covered
-                coverage_detail.append(f"'{sq}' → (no keywords, assumed covered)")
+                # No meaningful keywords — skip this segment entirely
+                coverage_detail.append(f"'{sq}' → (no keywords, skipped)")
+                total -= 1
                 continue
             overlap = sq_kw & resp_kw
             ratio = len(overlap) / len(sq_kw)
@@ -137,7 +139,6 @@ class CompletenessSkill(BaseSkill):
                 f"({'✓' if is_covered else '✗'})"
             )
 
-        total = len(sub_questions)
         score = covered / total if total else 0.0
 
         reasoning = (
